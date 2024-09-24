@@ -1,7 +1,6 @@
 // register_page.dart
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 class RegisterPage extends StatefulWidget {
   @override
@@ -12,62 +11,96 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  String errorMessage = '';
 
   Future<void> register() async {
+    setState(() {
+      errorMessage = ''; // Limpar mensagens de erro anteriores
+    });
+
+    String name = nameController.text;
+    String email = emailController.text;
+    String password = passwordController.text;
+
+    // Validações
+    if (name.isEmpty || name.length > 128) {
+      setState(() {
+        errorMessage = 'Nome é obrigatório e deve ter no máximo 128 caracteres';
+      });
+      _clearErrorMessageAfterDelay(); // Limpa após 4 segundos
+      return;
+    }
+
+    if (email.isEmpty || !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(email)) {
+      setState(() {
+        errorMessage = 'Email inválido';
+      });
+      _clearErrorMessageAfterDelay(); // Limpa após 4 segundos
+      return;
+    }
+
+    if (password.isEmpty || password.length < 6 || password.length > 16) {
+      setState(() {
+        errorMessage = 'A senha deve ter entre 6 e 16 caracteres';
+      });
+      _clearErrorMessageAfterDelay(); // Limpa após 4 segundos
+      return;
+    }
+
     try {
       final response = await http.post(
         Uri.parse('http://10.0.2.2:8000/api/register'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'name': nameController.text,
-          'email': emailController.text,
-          'password': passwordController.text,
-        }),
+        body: {
+          'name': name,
+          'email': email,
+          'password': password,
+        },
       );
 
+      print('Resposta do backend: ${response.body}');
       if (response.statusCode == 201) {
-        // Cadastro bem-sucedido
-        final data = jsonDecode(response.body);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Cadastro efetuado com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        // Voltar para a tela de login
-        Future.delayed(Duration(seconds: 2), () {
-          Navigator.pop(context);
-        });
+        Navigator.pop(context); // Voltar após registro bem-sucedido
       } else {
-        // Cadastro falhou
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Falha no cadastro: ${response.body}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        setState(() {
+          errorMessage = 'Erro ao cadastrar: ${response.body}';
+        });
+        _clearErrorMessageAfterDelay(); // Limpa após 4 segundos
       }
     } catch (e) {
-      // Exibe o erro no console e na tela
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao fazer cadastro: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      print('Erro ao fazer registro: $e');
+      setState(() {
+        errorMessage = 'Erro ao se conectar ao servidor';
+      });
+      _clearErrorMessageAfterDelay(); // Limpa após 4 segundos
     }
+  }
+
+  // Função para limpar a mensagem de erro após 4 segundos
+  void _clearErrorMessageAfterDelay() async {
+    await Future.delayed(Duration(seconds: 4));
+    setState(() {
+      errorMessage = '';
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Cadastro'),
+        title: Text('Cadastrar-se'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            if (errorMessage.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10.0),
+                child: Text(
+                  errorMessage,
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
             TextField(
               controller: nameController,
               decoration: InputDecoration(labelText: 'Nome'),
