@@ -49,47 +49,77 @@ class _LoginPageState extends State<LoginPage> {
       try {
         final response = await http.post(
           Uri.parse('http://10.0.2.2:8000/api/login'),
-          body: {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
             'email': emailController.text,
             'password': passwordController.text,
-          },
+          }),
         );
-        print('Resposta do backend: ${response.body}');
+        print('Resposta do servidor: ${response.body}');
         if (response.statusCode == 200) {
           final responseData = json.decode(response.body);
-          final token = responseData['access_token'];
+          print('Dados do access_token: ${responseData['access_token']}');
 
-          if (token != null) {
+          // Aqui você pega o access_token corretamente
+          final accessToken = responseData['access_token'];
+
+          if (accessToken != null) {
             final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('auth_token', token);
+            await prefs.setString('auth_token', accessToken); // Armazena o token corretamente
+
+            final role = responseData['role'];
+            await prefs.setString('user_role', role);
+
+            // Redireciona para Dashboard
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => DashboardPage()),
+            );
+          } else {
+            setState(() {
+              errorMessage = 'Erro de autenticação. Token inválido.';
+            });
           }
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => DashboardPage()),
-          );
         } else {
           setState(() {
             errorMessage = 'Usuário inválido. Por favor, realizar cadastro.';
           });
-          print('Falha no login: ${response.body}');
         }
       } catch (e) {
         print('Erro ao fazer login: $e');
+        setState(() {
+          errorMessage = 'Erro ao realizar login. Tente novamente.';
+        });
       }
     } else {
-      // Se o formulário não for válido, defina a mensagem de erro
       setState(() {
         errorMessage = 'Preencha todos os campos.';
       });
     }
 
-    // Limpar a mensagem de erro após 2 segundos
-    Future.delayed(Duration(seconds: 5), () {
+    // Limpar mensagem de erro após um tempo
+    Future.delayed(Duration(seconds: 4), () {
       setState(() {
         errorMessage = null;
       });
     });
   }
+
+  Future<void> someApiCall() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+
+    final response = await http.get(
+      Uri.parse('http://10.0.2.2:8000/api/some_endpoint'),
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+  }
+
 
   @override
   Widget build(BuildContext context) {
